@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Game Ular + Musuh — Ganti Warna</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;background:#000;color:#fff}
+  /* background gunung + langit biru (online high-res) */
+  body{
+    --bg-img: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1920&q=80');
+    display:flex;align-items:center;justify-content:center;
+    background-image:var(--bg-img);
+    background-size:cover;
+    background-position:center;
+    animation:panbg 40s linear infinite alternate;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  }
+  @keyframes panbg{0%{background-position:35% 50%}100%{background-position:65% 50%}}
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,0.22);pointer-events:none;z-index:0}
+
+  /* root container */
+  .root{position:relative;z-index:2;width:100%;max-width:480px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:10px}
+
+  /* START panel */
+  #startScreen{width:100%;background:rgba(0,0,0,0.55);padding:12px;border-radius:10px;text-align:center}
+  .btn{padding:8px 12px;border-radius:8px;border:0;background:#0af;color:#fff;cursor:pointer;font-size:13px}
+  .btn:active{transform:translateY(1px)}
+  .small{padding:6px 10px;font-size:12px}
+  .difficulty{display:flex;gap:8px;justify-content:center;margin-top:8px}
+
+  /* color button & panel */
+  #colorBtn { margin-left:8px; background: linear-gradient(90deg,#ff9a9e,#fad0c4); color:#000; }
+  #colorPanel {
+    display:none;
+    margin-top:10px;
+    background: rgba(255,255,255,0.06);
+    padding:10px;
+    border-radius:8px;
+    text-align:left;
+  }
+  #colorPanel label{display:block;font-size:13px;margin-bottom:6px}
+  #colorRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .colorItem{display:flex;flex-direction:column;gap:6px;align-items:center}
+
+  /* game container */
+  #gameContainer{display:none;width:100%;align-items:center;gap:8px;position:relative}
+  #scoreTop{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(0,0,0,0.6);padding:6px 10px;border-radius:8px;font-weight:700;font-size:15px;min-width:56px;text-align:center}
+  #highTop{position:absolute;top:8px;right:10px;z-index:6;background:rgba(0,0,0,0.55);padding:6px 8px;border-radius:8px;font-size:13px}
+
+  canvas#game{width:320px;height:320px;background:rgba(0,0,0,0.36);border-radius:6px;border:2px solid rgba(255,255,255,0.08);touch-action:none;display:block}
+
+  #controlsRow{margin-top:8px;width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  #controlsLeft,#controlsRight{display:flex;gap:8px;align-items:center}
+
+  .joystick-wrap{position:absolute;left:50%;transform:translateX(-50%);bottom:-62px;z-index:6}
+  canvas#joy{width:92px;height:92px;border-radius:50%;background:#111;display:block}
+
+  /* save/reset color buttons in panel */
+  #colorActions{display:flex;gap:8px;justify-content:center;margin-top:8px}
+
+  @media (max-width:420px){
+    canvas#game{width:calc(100vw - 48px);height:calc(100vw - 48px);max-width:320px;max-height:320px}
+    .joystick-wrap{bottom:-74px}
+  }
+</style>
+</head>
+<body>
+<div id="overlay"></div>
+
+<div class="root">
+  <!-- Start Screen -->
+  <div id="startScreen" aria-hidden="false">
+    <h2 style="margin:6px 0 10px 0;font-size:18px">🎮 Game Ular + Musuh</h2>
+
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+      <button id="startBtn" class="btn">Mulai</button>
+      <button id="restartBtn" class="btn" style="display:none">Ulang</button>
+      <button id="colorBtn" class="btn small">Ganti Warna</button>
+    </div>
+
+    <div id="colorPanel" aria-hidden="true">
+      <div id="colorRow">
+        <div class="colorItem">
+          <label for="snakeColor">Warna Ular</label>
+          <input id="snakeColor" type="color" value="#00f0ff">
+        </div>
+        <div class="colorItem">
+          <label for="enemyColor">Warna Musuh</label>
+          <input id="enemyColor" type="color" value="#dc143c">
+        </div>
+        <div class="colorItem">
+          <label for="appleColor">Warna Makanan</label>
+          <input id="appleColor" type="color" value="#00ff00">
+        </div>
+      </div>
+      <div id="colorActions">
+        <button id="saveColors" class="btn small">Simpan</button>
+        <button id="resetColors" class="btn small">Reset</button>
+        <button id="closeColors" class="btn small">Tutup</button>
+      </div>
+    </div>
+
+    <div class="difficulty" style="margin-top:8px">
+      <button class="btn small" data-diff="easy">Easy</button>
+      <button class="btn small" data-diff="normal">Normal</button>
+      <button class="btn small" data-diff="hard">Hard</button>
+    </div>
+
+    <div style="margin-top:8px;font-size:13px;color:#ddd">Pilih warna lewat tombol "Ganti Warna" lalu tekan <strong>Mulai</strong>.</div>
+  </div>
+
+  <!-- Game area -->
+  <div id="gameContainer" aria-hidden="true">
+    <div id="scoreTop">0</div>
+    <canvas id="game" width="320" height="320" aria-label="game canvas"></canvas>
+
+    <div id="controlsRow">
+      <div id="controlsLeft"><div id="highTop">0</div></div>
+      <div id="controlsRight">
+        <button id="pauseBtn" class="btn small">Pause</button>
+        <button id="muteBtn" class="btn small">Mute</button>
+      </div>
+    </div>
+
+    <div class="joystick-wrap">
+      <canvas id="joy" width="92" height="92" aria-label="joystick"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Audio elements -->
+<audio id="eatSound" src="eat.mp3"></audio>
+<audio id="extraEatSound" src="crunch.mp3"></audio>
+<audio id="gameOverSound" src="gameover.mp3"></audio>
+<audio id="bgMusic" src="https://www.bensound.com/bensound-music/bensound-acousticbreeze.mp3" loop></audio>
+<audio id="chaseSound" src="chase.mp3" loop></audio>
+<audio id="heartbeatSound" src="heartbeat.mp3" loop></audio>
+
+<script>
+/* ===========================
+   Semua fitur lama tetap ada.
+   Penambahan:
+   - Tombol "Ganti Warna" di menu awal
+   - Panel color picker (Ular, Musuh, Makanan)
+   - Save ke localStorage (warna tersimpan)
+   - Warnanya langsung dipakai saat main dimulai
+   =========================== */
+
+/* Elements */
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const startScreen = document.getElementById('startScreen');
+const gameContainer = document.getElementById('gameContainer');
+const pauseBtn = document.getElementById('pauseBtn');
+const muteBtn = document.getElementById('muteBtn');
+
+const colorBtn = document.getElementById('colorBtn');
+const colorPanel = document.getElementById('colorPanel');
+const saveColorsBtn = document.getElementById('saveColors');
+const resetColorsBtn = document.getElementById('resetColors');
+const closeColorsBtn = document.getElementById('closeColors');
+
+const snakeColorInput = document.getElementById('snakeColor');
+const enemyColorInput = document.getElementById('enemyColor');
+const appleColorInput = document.getElementById('appleColor');
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const joy = document.getElementById('joy');
+const joyCtx = joy.getContext('2d');
+
+const scoreTop = document.getElementById('scoreTop');
+const highTop = document.getElementById('highTop');
+
+const eatSound = document.getElementById('eatSound');
+const extraEatSound = document.getElementById('extraEatSound');
+const gameOverSound = document.getElementById('gameOverSound');
+const bgMusic = document.getElementById('bgMusic');
+const chaseSound = document.getElementById('chaseSound');
+const heartbeatSound = document.getElementById('heartbeatSound');
+
+/* Game state (preserve original logic) */
+const grid = 16;
+const tileCount = canvas.width / grid; // 20
+let snake = [{x:10,y:10}];
+let direction = {x:0,y:0};
+let apple = {x:5,y:5};
+let enemy = {x:15,y:15};
+let score = 0;
+let count = 0;
+let speedFactor = 6;
+let enemySpeed = 3;
+let enemyMoveCounter = 0;
+let running = false, paused = false;
+let rafId = null;
+
+let highscore = parseInt(localStorage.getItem('snake_highscore') || '0', 10);
+highTop.textContent = String(highscore);
+scoreTop.textContent = String(score);
+
+/* Colors: load from localStorage if exists, else defaults */
+const STORAGE_COLORS_KEY = 'snake_game_colors_v1';
+const defaultColors = { snake: '#00f0ff', enemy: '#dc143c', apple: '#00ff00' };
+function loadColors(){
+  try{
+    const raw = localStorage.getItem(STORAGE_COLORS_KEY);
+    if(raw){
+      const obj = JSON.parse(raw);
+      snakeColorInput.value = obj.snake || defaultColors.snake;
+      enemyColorInput.value = obj.enemy || defaultColors.enemy;
+      appleColorInput.value = obj.apple || defaultColors.apple;
+    } else {
+      snakeColorInput.value = defaultColors.snake;
+      enemyColorInput.value = defaultColors.enemy;
+      appleColorInput.value = defaultColors.apple;
+    }
+  }catch(e){
+    snakeColorInput.value = defaultColors.snake;
+    enemyColorInput.value = defaultColors.enemy;
+    appleColorInput.value = defaultColors.apple;
+  }
+}
+loadColors();
+
+/* Apply current colors to variables used by drawGame (read from inputs) */
+function getCurrentColors(){
+  return {
+    snake: snakeColorInput.value,
+    enemy: enemyColorInput.value,
+    apple: appleColorInput.value
+  };
+}
+
+/* Save colors to localStorage */
+function saveColors(){
+  const obj = getCurrentColors();
+  localStorage.setItem(STORAGE_COLORS_KEY, JSON.stringify(obj));
+}
+
+/* Reset colors to defaults */
+function resetColors(){
+  snakeColorInput.value = defaultColors.snake;
+  enemyColorInput.value = defaultColors.enemy;
+  appleColorInput.value = defaultColors.apple;
+  saveColors();
+}
+
+/* helpers */
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function setDifficulty(level){
+  if(level==='easy'){ speedFactor=8; enemySpeed=5; }
+  else if(level==='normal'){ speedFactor=6; enemySpeed=3; }
+  else if(level==='hard'){ speedFactor=4; enemySpeed=2; }
+}
+setDifficulty('normal');
+
+function resetGameState(){
+  snake = [{x:10,y:10}];
+  direction = {x:0,y:0};
+  apple = { x: Math.floor(Math.random()*tileCount), y: Math.floor(Math.random()*tileCount) };
+  enemy = { x: Math.floor(Math.random()*tileCount), y: Math.floor(Math.random()*tileCount) };
+  score = 0;
+  scoreTop.textContent = String(score);
+}
+
+/* reset on game over */
+function resetGame(){
+  try{ chaseSound.pause(); chaseSound.currentTime=0; heartbeatSound.pause(); heartbeatSound.currentTime=0; }catch(e){}
+  try{ gameOverSound.currentTime=0; gameOverSound.play(); }catch(e){}
+  running=false; paused=false; cancelAnimationFrame(rafId); rafId=null;
+
+  if(score>highscore){ highscore=score; localStorage.setItem('snake_highscore',String(highscore)); highTop.textContent = String(highscore); }
+  alert('Game Over! Skor kamu: ' + score);
+  resetGameState();
+  restartBtn.style.display='inline-block';
+  startScreen.style.display='block';
+  gameContainer.style.display='none';
+}
+
+/* direction setter (prevent 180) */
+function setDirection(dir){
+  switch(dir){
+    case 'up': if(direction.y === 0) direction = {x:0,y:-1}; break;
+    case 'down': if(direction.y === 0) direction = {x:0,y:1}; break;
+    case 'left': if(direction.x === 0) direction = {x:-1,y:0}; break;
+    case 'right': if(direction.x === 0) direction = {x:1,y:0}; break;
+  }
+}
+
+/* keyboard */
+document.addEventListener('keydown', e => {
+  if(e.key === 'ArrowUp') setDirection('up');
+  else if(e.key === 'ArrowDown') setDirection('down');
+  else if(e.key === 'ArrowLeft') setDirection('left');
+  else if(e.key === 'ArrowRight') setDirection('right');
+});
+
+/* joystick center bottom */
+const joyCenter = { x: joy.width/2, y: joy.height/2 };
+function drawJoystick(dx=0, dy=0){
+  joyCtx.clearRect(0,0,joy.width,joy.height);
+  joyCtx.beginPath(); joyCtx.arc(joyCenter.x, joyCenter.y, 40, 0, Math.PI*2); joyCtx.fillStyle = '#111'; joyCtx.fill();
+  joyCtx.beginPath(); joyCtx.arc(joyCenter.x + dx, joyCenter.y + dy, 14, 0, Math.PI*2); joyCtx.fillStyle = '#0af'; joyCtx.fill();
+}
+drawJoystick();
+
+joy.addEventListener('touchstart', handleJoyMove, {passive:false});
+joy.addEventListener('touchmove', handleJoyMove, {passive:false});
+joy.addEventListener('touchend', ()=>{ drawJoystick(); direction={x:0,y:0}; });
+
+function handleJoyMove(evt){
+  evt.preventDefault();
+  const touch = (evt.touches && evt.touches[0]) || evt;
+  const rect = joy.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  const dx = x - joyCenter.x;
+  const dy = y - joyCenter.y;
+  drawJoystick(dx, dy);
+  if(Math.abs(dx) > Math.abs(dy)){
+    if(dx > 10) setDirection('right'); else if(dx < -10) setDirection('left');
+  } else {
+    if(dy > 10) setDirection('down'); else if(dy < -10) setDirection('up');
+  }
+}
+
+/* pause / mute */
+let muted = false;
+pauseBtn.addEventListener('click', ()=>{
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  if(!paused && running){ rafId = requestAnimationFrame(gameLoop); }
+  else { cancelAnimationFrame(rafId); rafId=null; }
+});
+muteBtn.addEventListener('click', ()=>{
+  muted = !muted; muteBtn.textContent = muted ? 'Unmute' : 'Mute';
+  [bgMusic, chaseSound, heartbeatSound, eatSound, extraEatSound, gameOverSound].forEach(a=>{ try{ a.muted = muted; }catch(e){} });
+});
+
+/* start / restart */
+startBtn.addEventListener('click', ()=>{
+  restartBtn.style.display='none';
+  startScreen.style.display='none';
+  gameContainer.style.display='flex';
+
+  // ensure colors saved/applied
+  saveColors(); // store current pickers before start
+  try{ bgMusic.currentTime = 0; bgMusic.volume = 0.45; bgMusic.play().catch(()=>{}); }catch(e){}
+  try{ chaseSound.loop = true; chaseSound.volume = 0; chaseSound.play().catch(()=>{}); heartbeatSound.loop = true; heartbeatSound.volume = 0; heartbeatSound.play().catch(()=>{}); }catch(e){}
+
+  resetGameState();
+  running = true; paused = false;
+  rafId = requestAnimationFrame(gameLoop);
+});
+
+restartBtn.addEventListener('click', ()=>{
+  restartBtn.style.display='none';
+  startScreen.style.display='none';
+  gameContainer.style.display='flex';
+  resetGameState(); running=true; paused=false;
+  try{ bgMusic.currentTime = 0; bgMusic.play().catch(()=>{}); chaseSound.currentTime = 0; chaseSound.play().catch(()=>{}); heartbeatSound.currentTime = 0; heartbeatSound.play().catch(()=>{}); }catch(e){}
+  rafId = requestAnimationFrame(gameLoop);
+});
+
+/* difficulty buttons */
+document.querySelectorAll('.difficulty .btn').forEach(b=>{
+  b.addEventListener('click', ()=> setDifficulty(b.dataset.diff));
+});
+
+/* color panel button handlers */
+colorBtn.addEventListener('click', ()=>{
+  colorPanel.style.display = colorPanel.style.display === 'block' ? 'none' : 'block';
+});
+closeColorsBtn.addEventListener('click', ()=> colorPanel.style.display = 'none');
+saveColorsBtn.addEventListener('click', ()=>{
+  saveColors();
+  colorPanel.style.display = 'none';
+});
+resetColorsBtn.addEventListener('click', ()=>{
+  resetColors();
+});
+
+/* load saved colors into inputs on start */
+(function applySavedColorsToInputs(){
+  loadColors();
+})();
+
+/* main loop */
+function gameLoop(){
+  if(!running || paused) return;
+  if(++count < speedFactor){ rafId = requestAnimationFrame(gameLoop); return; }
+  count = 0;
+
+  const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+  // collisions
+  if(head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount){ resetGame(); return; }
+  for(let i=1;i<snake.length;i++){ if(snake[i].x===head.x && snake[i].y===head.y){ resetGame(); return; } }
+  if(head.x===enemy.x && head.y===enemy.y){ resetGame(); return; }
+
+  snake.unshift(head);
+
+  // eat apple
+  if(head.x===apple.x && head.y===apple.y){
+    score++; scoreTop.textContent = String(score);
+    try{ eatSound.currentTime=0; eatSound.play(); }catch(e){}
+    setTimeout(()=>{ try{ extraEatSound.currentTime=0; extraEatSound.play(); }catch(e){} }, 120);
+    // reposition apple (avoid snake & enemy)
+    let tries=0;
+    do{
+      apple.x = Math.floor(Math.random()*tileCount);
+      apple.y = Math.floor(Math.random()*tileCount);
+      tries++; if(tries>60) break;
+    } while(snake.some(s=>s.x===apple.x && s.y===apple.y) || (enemy.x===apple.x && enemy.y===apple.y));
+  } else {
+    snake.pop();
+  }
+
+  // enemy movement (chase smarter)
+  if(++enemyMoveCounter >= enemySpeed){
+    enemyMoveCounter = 0;
+    const dx = snake[0].x - enemy.x;
+    const dy = snake[0].y - enemy.y;
+    if(Math.abs(dx) > Math.abs(dy)) enemy.x += (dx>0?1:-1);
+    else if(dy !== 0) enemy.y += (dy>0?1:-1);
+    enemy.x = clamp(enemy.x,0,tileCount-1);
+    enemy.y = clamp(enemy.y,0,tileCount-1);
+  }
+
+  // audio dynamics based on distance
+  const ddx = (enemy.x - snake[0].x), ddy = (enemy.y - snake[0].y);
+  const distance = Math.sqrt(ddx*ddx + ddy*ddy);
+  const maxDistance = Math.sqrt(tileCount*tileCount);
+  let chaseVolume = 1 - (distance / maxDistance);
+  chaseVolume = clamp(chaseVolume,0,1);
+  chaseSound.volume = Math.pow(chaseVolume,0.9) * 0.9;
+
+  const heartbeatThreshold = 5;
+  if(distance <= heartbeatThreshold){
+    const hbVol = clamp(1 - (distance / heartbeatThreshold),0,1);
+    heartbeatSound.volume = Math.pow(hbVol,1.1) * 0.95;
+    if(heartbeatSound.paused && !muted){ heartbeatSound.currentTime = 0; heartbeatSound.play().catch(()=>{}); }
+  } else {
+    heartbeatSound.volume = 0;
+    if(!heartbeatSound.paused && heartbeatSound.volume <= 0.001){ heartbeatSound.pause(); heartbeatSound.currentTime = 0; }
+  }
+
+  if(chaseSound.paused && !muted){ chaseSound.currentTime=0; chaseSound.play().catch(()=>{}); }
+
+  drawGame();
+  rafId = requestAnimationFrame(gameLoop);
+}
+
+/* draw only (uses colors from inputs / localStorage values) */
+function drawGame(){
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // get colors current (inputs reflect last saved or default)
+  const colors = getCurrentColors();
+
+  // apple
+  ctx.fillStyle = colors.apple;
+  ctx.fillRect(apple.x*grid, apple.y*grid, grid-1, grid-1);
+
+  // enemy
+  ctx.fillStyle = colors.enemy;
+  ctx.fillRect(enemy.x*grid, enemy.y*grid, grid-1, grid-1);
+
+  // snake
+  ctx.fillStyle = colors.snake;
+  for(let i=0;i<snake.length;i++){
+    const s = snake[i];
+    ctx.fillRect(s.x*grid, s.y*grid, grid-1, grid-1);
+    if(i===0){
+      // small eye (inverted)
+      const eyeCol = invertColor(colors.snake);
+      ctx.fillStyle = eyeCol;
+      ctx.fillRect(s.x*grid + Math.floor(grid/4), s.y*grid + Math.floor(grid/6), 2, 2);
+      ctx.fillStyle = colors.snake;
+    }
+  }
+}
+
+/* invert util */
+function invertColor(hex){
+  try{
+    if(!hex) return '#fff';
+    let c = hex.replace('#','');
+    if(c.length===3) c = c.split('').map(ch=>ch+ch).join('');
+    const r = 255 - parseInt(c.substring(0,2),16);
+    const g = 255 - parseInt(c.substring(2,4),16);
+    const b = 255 - parseInt(c.substring(4,6),16);
+    return rgb('${r},${g},${b}');
+  }catch(e){ return '#fff'; }
+}
+
+/* save highscore on unload */
+window.addEventListener('beforeunload', ()=>{ if(score>highscore) localStorage.setItem('snake_highscore',String(score)); });
+
+/* responsive canvas scaling */
+function fitCanvas(){
+  const maxW = Math.min(window.innerWidth - 24, 360);
+  canvas.style.width = maxW + 'px';
+  canvas.style.height = maxW + 'px';
+}
+fitCanvas(); window.addEventListener('resize', fitCanvas);
+
+/* initial state */
+resetGameState(); drawGame();
+
+</script>
+</body>
+</html>

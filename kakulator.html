@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kalkulator</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: #2c2c2c;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 0 20px #00ff99;
+      width: 320px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .display {
+      background: #000;
+      color: #0f0;
+      font-size: 32px;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: right;
+      margin-bottom: 15px;
+      overflow-x: auto;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      padding: 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #00ff99;
+      color: #000;
+    }
+
+    .operator {
+      background: #ff9800;
+      color: #000;
+    }
+
+    .equal {
+      background: #00ff99;
+      color: #000;
+      grid-column: span 2;
+    }
+
+    .clear {
+      background: #f44336;
+      color: #fff;
+    }
+
+    #rumusContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .rumus {
+      position: absolute;
+      font-size: 20px;
+      color: rgba(0, 255, 255, 0.2);
+      animation: gerak 10s linear infinite;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    @keyframes gerak {
+      0% { transform: translateY(-50px); opacity: 0; }
+      50% { opacity: 1; }
+      100% { transform: translateY(100vh); opacity: 0; }
+    }
+
+    #riwayat {
+      margin-top: 10px;
+      font-family: monospace;
+      color: #fff;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <audio id="bgm" src="menu.mp3" autoplay loop></audio>
+  <div id="rumusContainer"></div>
+
+  <div class="container">
+    <div class="display" id="display">0</div>
+    <div class="buttons">
+      <button onclick="clearDisplay()" class="clear">C</button>
+      <button onclick="percent()">%</button>
+      <button onclick="backspace()">⌫</button>
+      <button class="operator" onclick="appendOperator('/')">÷</button>
+
+      <button onclick="append('7')">7</button>
+      <button onclick="append('8')">8</button>
+      <button onclick="append('9')">9</button>
+      <button class="operator" onclick="appendOperator('*')">×</button>
+
+      <button onclick="append('4')">4</button>
+      <button onclick="append('5')">5</button>
+      <button onclick="append('6')">6</button>
+      <button class="operator" onclick="appendOperator('-')">−</button>
+
+      <button onclick="append('1')">1</button>
+      <button onclick="append('2')">2</button>
+      <button onclick="append('3')">3</button>
+      <button class="operator" onclick="appendOperator('+')">+</button>
+
+      <button onclick="tampilkanRiwayat()">⏱</button>
+      <button onclick="append('0')">0</button>
+      <button onclick="append('.')">.</button>
+      <button class="operator" onclick="calculate()">=</button>
+
+      <button onclick="convertToUSD()">→ USD</button>
+      <button onclick="convertToIDR()">→ IDR</button>
+      <button onclick="convertToEUR()">→ EUR</button>
+      <button onclick="convertToMYR()">→ MYR</button>
+    </div>
+    <div id="riwayat"></div>
+  </div>
+
+  <script>
+    const suaraTombol = {
+  '0': 'nol', '1': 'satu', '2': 'dua', '3': 'tiga', '4': 'empat',
+  '5': 'lima', '6': 'enam', '7': 'tujuh', '8': 'delapan', '9': 'sembilan',
+  '.': 'titik', '+': 'ditambah', '-': 'dikurang', '*': 'dikali', '/': 'dibagi'
+};
+
+    let riwayatOperasi = [];
+    const display = document.getElementById("display");
+
+    window.addEventListener("click", () => {
+      const bgm = document.getElementById("bgm");
+      if (bgm.paused) bgm.play();
+    });
+
+    function append(value) {
+  if (display.textContent === "0" || display.textContent === "Error") {
+    display.textContent = value;
+  } else {
+    display.textContent += value;
+  }
+
+  if (suaraTombol[value]) bicara(suaraTombol[value]);
+}
+
+    function appendOperator(op) {
+  const lastChar = display.textContent.slice(-1);
+  if ("+-*/.".includes(lastChar)) return;
+  if (display.textContent === "0" || display.textContent === "Error") return;
+  append(op); // sudah bicara di append()
+}
+
+
+    function clearDisplay() {
+      display.textContent = "0";
+    }
+
+    function bersihkanEkspresi(teks) {
+      return teks.replace(/[^\d\.\+\-\*\/\(\)]/g, "");
+    }
+
+    function calculate() {
+      try {
+        const ekspresiAsli = display.textContent;
+        const ekspresi = bersihkanEkspresi(ekspresiAsli);
+        if (!ekspresi || ekspresi === "0") return;
+
+        const hasil = eval(ekspresi);
+        display.textContent = hasil;
+        riwayatOperasi.push("${ekspresiAsli} = ${hasil}");
+        const narasi = buatNarasi(ekspresi, hasil);
+        bicara(narasi);
+      } catch {
+        display.textContent = "Error";
+        bicara("Terjadi kesalahan dalam perhitungan");
+      }
+    }
+
+    function percent() {
+      try {
+        const ekspresi = display.textContent;
+        const nilai = eval(bersihkanEkspresi(ekspresi));
+        const hasil = nilai / 100;
+        display.textContent = hasil;
+        riwayatOperasi.push("${ekspresi}% = ${hasil}");
+        bicara("${ekspresi} persen sama dengan ${hasil}");
+      } catch {
+        display.textContent = "Error";
+        bicara("Terjadi kesalahan saat menghitung persen");
+      }
+    }
+
+    function backspace() {
+      const current = display.textContent;
+      display.textContent = current.length > 1 ? current.slice(0, -1) : "0";
+    }
+
+    function tampilkanRiwayat() {
+      const riwayatDiv = document.getElementById("riwayat");
+      if (riwayatDiv.style.display === "none" || riwayatDiv.style.display === "") {
+        riwayatDiv.innerHTML = riwayatOperasi.length === 0
+          ? "Belum ada riwayat."
+          : "<strong>Riwayat Operasi:</strong><br>" + riwayatOperasi.map(r =>  `${r}`).join("<br>");
+        riwayatDiv.style.display = "block";
+      } else {
+        riwayatDiv.style.display = "none";
+      }
+    }
+
+    function convertToUSD() {
+      try {
+        const value = parseFloat(display.textContent);
+        if (isNaN(value)) return;
+        const hasil = value / 15000;
+        display.textContent = hasil.toFixed(2) + " $";
+        riwayatOperasi.push("${value} IDR = ${hasil.toFixed(2)} USD");
+        bicara("${value} rupiah dikonversikan ke dolar menjadi ${hasil.toFixed(2)} dolar");
+      } catch {
+        display.textContent = "Error";
+        bicara("Terjadi kesalahan saat konversi");
+      }
+    }
+
+    function convertToIDR() {
+  try {
+    const value = parseFloat(display.textContent);
+    if (isNaN(value)) return;
+    const hasil = value * 15000;
+    display.textContent = hasil + " Rp";
+    riwayatOperasi.push("${value} USD = ${hasil} IDR");
+    bicara("${value} dolar dikonversikan ke rupiah menjadi ${hasil.toFixed(2)} rupiah");
+  } catch {
+    display.textContent = "Error";
+    bicara("Terjadi kesalahan saat konversi");
+  }
+}
+
+
+    function convertToEUR() {
+      try {
+        const value = parseFloat(display.textContent);
+        if (isNaN(value)) return;
+        const hasil = value / 18961;
+        display.textContent = hasil.toFixed(2) + " €";
+        riwayatOperasi.push("${value} IDR = ${hasil.toFixed(2)} EUR");
+        bicara("${value} rupiah dikonversikan ke euro menjadi ${hasil.toFixed(2)} euro");
+      } catch {
+        display.textContent = "Error";
+        bicara("Terjadi kesalahan saat konversi");
+      }
+    }
+
+    function convertToMYR() {
+      try {
+        const value = parseFloat(display.textContent);
+        if (isNaN(value)) return;
+        const hasil = value / 3500;
+        display.textContent = hasil.toFixed(2) + " RM";
+        riwayatOperasi.push("${value} IDR = ${hasil.toFixed(2)} MYR");
+        bicara("${value} rupiah dikonversikan ke ringgit menjadi $ {hasil.toFixed(2)} ringgit");
+      } catch {
+        display.textContent = "Error";
+        bicara("Terjadi kesalahan saat konversi");
+      }
+    }
+
+    function bicara(teks) {
+      const bgm = document.getElementById("bgm");
+      const suara = new SpeechSynthesisUtterance(teks);
+      suara.lang = "id-ID";
+      suara.rate = 1;
+      bgm.volume = 0.2;
+      suara.onend = () => {
+        bgm.volume = 1.0;
+      };
+      speechSynthesis.speak(suara);
+    }
+
+    function buatNarasi(ekspresi, hasil) {
+      let kalimat = ekspresi
+        .replace(/\*/g, " dikali ")
+        .replace(/\//g, " dibagi ")
+        .replace(/\+/g, " ditambah ")
+        .replace(/-/g, " dikurang ");
+      return "${kalimat} sama dengan ${hasil}";
+    }
+
+    const rumusList = [
+      "E = mc²", "π ≈ 3.14", "a² + b² = c²", "F = ma", "Δx · Δp ≥ ħ/2",
+      "sin²θ + cos²θ = 1", "∫f(x)dx", "log(xy) = log x + log y",
+      "V = IR", "x = (-b ± √Δ)/2a"
+    ];
+
+    function buatRumusAcak() {
+      const rumusContainer = document.getElementById("rumusContainer");
+      const rumus = document.createElement("div");
+      rumus.className = "rumus";
+      rumus.textContent = rumusList[Math.floor(Math.random() * rumusList.length)];
+      rumus.style.left = Math.random() * window.innerWidth + "px";
+      rumus.style.top = "-50px";
+      rumus.style.fontSize = (16 + Math.random() * 20) + "px";
+      rumusContainer.appendChild(rumus);
+      setTimeout(() => rumus.remove(), 10000);
+    }
+
+    setInterval(buatRumusAcak, 1000);
+  </script>
+</body>
+</html>
